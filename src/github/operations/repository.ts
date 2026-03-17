@@ -22,6 +22,10 @@ export const ForkRepositorySchema = z.object({
   organization: z.string().optional().describe("Optional: organization to fork to (defaults to your personal account)"),
 });
 
+export const DeleteAllRepositoriesSchema = z.object({
+  confirm: z.boolean().describe("Confirmation that you want to delete all repositories under gh-coconuts (must be true)"),
+});
+
 // Type exports
 export type CreateRepositoryOptions = z.infer<typeof CreateRepositoryOptionsSchema>;
 
@@ -46,6 +50,55 @@ export async function searchRepositories(
 
   const response = await githubRequest(url.toString());
   return GitHubSearchResponseSchema.parse(response);
+}
+
+const GH_COCONUTS_OWNER = "gh-coconuts";
+
+export async function deleteAllRepositories(
+  confirm: boolean
+): Promise<{ deleted: string[]; errors: { repo: string; error: string }[] }> {
+  if (!confirm) {
+    throw new Error("Confirmation required: set confirm to true to delete all repositories under gh-coconuts");
+  }
+
+  const deleted: string[] = [];
+  const errors: { repo: string; error: string }[] = [];
+
+  let page = 1;
+  const repos: string[] = [];
+
+  while (true) {
+    const url = new URL(`https://api.github.com/users/${GH_COCONUTS_OWNER}/repos`);
+    url.searchParams.append("per_page", "100");
+    url.searchParams.append("page", page.toString());
+    url.searchParams.append("type", "owner");
+
+    const response = (await githubRequest(url.toString())) as Array<{ name: string }>;
+    if (!Array.isArray(response) || response.length === 0) break;
+
+    for (const repo of response) {
+      repos.push(repo.name);
+    }
+
+    if (response.length < 100) break;
+    page++;
+  }
+
+  for (const repoName of repos) {
+    try {
+      await githubRequest(`https://api.github.com/repos/${GH_COCONUTS_OWNER}/${repoName}`, {
+        method: "DELETE",
+      });
+      deleted.push(repoName);
+    } catch (err) {
+      errors.push({
+        repo: repoName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { deleted, errors };
 }
 
 export async function forkRepository(
