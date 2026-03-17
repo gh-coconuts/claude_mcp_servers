@@ -22,6 +22,11 @@ export const ForkRepositorySchema = z.object({
   organization: z.string().optional().describe("Optional: organization to fork to (defaults to your personal account)"),
 });
 
+export const DeleteAllRepositoriesSchema = z.object({
+  owner: z.string().describe("Repository owner (username or organization)"),
+  confirm: z.boolean().describe("Confirmation that you want to delete all repositories (must be true)"),
+});
+
 // Type exports
 export type CreateRepositoryOptions = z.infer<typeof CreateRepositoryOptionsSchema>;
 
@@ -46,6 +51,56 @@ export async function searchRepositories(
 
   const response = await githubRequest(url.toString());
   return GitHubSearchResponseSchema.parse(response);
+}
+
+export async function deleteAllRepositories(
+  owner: string,
+  confirm: boolean
+): Promise<{ deleted: string[]; errors: { repo: string; error: string }[] }> {
+  if (!confirm) {
+    throw new Error("Confirmation required: set confirm to true to delete all repositories");
+  }
+
+  const deleted: string[] = [];
+  const errors: { repo: string; error: string }[] = [];
+
+  let page = 1;
+  const repos: string[] = [];
+
+  // Collect all repos (try user endpoint, fall back to org endpoint)
+  while (true) {
+    const url = new URL(`https://api.github.com/users/${owner}/repos`);
+    url.searchParams.append("per_page", "100");
+    url.searchParams.append("page", page.toString());
+    url.searchParams.append("type", "owner");
+
+    const response = (await githubRequest(url.toString())) as Array<{ name: string }>;
+    if (!Array.isArray(response) || response.length === 0) break;
+
+    for (const repo of response) {
+      repos.push(repo.name);
+    }
+
+    if (response.length < 100) break;
+    page++;
+  }
+
+  // Delete each repo
+  for (const repoName of repos) {
+    try {
+      await githubRequest(`https://api.github.com/repos/${owner}/${repoName}`, {
+        method: "DELETE",
+      });
+      deleted.push(repoName);
+    } catch (err) {
+      errors.push({
+        repo: repoName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { deleted, errors };
 }
 
 export async function forkRepository(

@@ -148,7 +148,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "get_issue",
         description: "Get details of a specific issue in a GitHub repository.",
         inputSchema: zodToJsonSchema(issues.GetIssueSchema)
-      }
+      },
+      {
+        name: "delete_all_repositories",
+        description: "Delete all repositories owned by a user or organization. This is a destructive operation and requires confirmation.",
+        inputSchema: zodToJsonSchema(repository.DeleteAllRepositoriesSchema),
+      },
     ],
   };
 });
@@ -331,6 +336,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const issue = await issues.getIssue(args.owner, args.repo, args.issue_number);
         return {
           content: [{ type: "text", text: JSON.stringify(issue, null, 2) }],
+        };
+      }
+
+      case "delete_all_repositories": {
+        const args = repository.DeleteAllRepositoriesSchema.parse(request.params.arguments);
+        const result = await repository.deleteAllRepositories(args.owner, args.confirm);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
