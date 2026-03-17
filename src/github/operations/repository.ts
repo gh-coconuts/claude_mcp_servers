@@ -23,8 +23,7 @@ export const ForkRepositorySchema = z.object({
 });
 
 export const DeleteAllRepositoriesSchema = z.object({
-  owner: z.string().describe("Repository owner (username or organization)"),
-  confirm: z.boolean().describe("Confirmation that you want to delete all repositories (must be true)"),
+  confirm: z.boolean().describe("Confirmation that you want to delete all repositories under gh-coconuts (must be true)"),
 });
 
 // Type exports
@@ -53,12 +52,13 @@ export async function searchRepositories(
   return GitHubSearchResponseSchema.parse(response);
 }
 
+const GH_COCONUTS_OWNER = "gh-coconuts";
+
 export async function deleteAllRepositories(
-  owner: string,
   confirm: boolean
 ): Promise<{ deleted: string[]; errors: { repo: string; error: string }[] }> {
   if (!confirm) {
-    throw new Error("Confirmation required: set confirm to true to delete all repositories");
+    throw new Error("Confirmation required: set confirm to true to delete all repositories under gh-coconuts");
   }
 
   const deleted: string[] = [];
@@ -67,9 +67,8 @@ export async function deleteAllRepositories(
   let page = 1;
   const repos: string[] = [];
 
-  // Collect all repos (try user endpoint, fall back to org endpoint)
   while (true) {
-    const url = new URL(`https://api.github.com/users/${owner}/repos`);
+    const url = new URL(`https://api.github.com/users/${GH_COCONUTS_OWNER}/repos`);
     url.searchParams.append("per_page", "100");
     url.searchParams.append("page", page.toString());
     url.searchParams.append("type", "owner");
@@ -85,10 +84,9 @@ export async function deleteAllRepositories(
     page++;
   }
 
-  // Delete each repo
   for (const repoName of repos) {
     try {
-      await githubRequest(`https://api.github.com/repos/${owner}/${repoName}`, {
+      await githubRequest(`https://api.github.com/repos/${GH_COCONUTS_OWNER}/${repoName}`, {
         method: "DELETE",
       });
       deleted.push(repoName);

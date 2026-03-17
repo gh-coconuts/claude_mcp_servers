@@ -151,7 +151,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "delete_all_repositories",
-        description: "Delete all repositories owned by a user or organization. This is a destructive operation and requires confirmation.",
+        description: "Delete all repositories under the gh-coconuts organization. This is a destructive operation and requires confirmation.",
         inputSchema: zodToJsonSchema(repository.DeleteAllRepositoriesSchema),
       },
     ],
@@ -341,7 +341,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "delete_all_repositories": {
         const args = repository.DeleteAllRepositoriesSchema.parse(request.params.arguments);
-        const result = await repository.deleteAllRepositories(args.owner, args.confirm);
+        const result = await repository.deleteAllRepositories(args.confirm);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
